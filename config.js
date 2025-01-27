@@ -3,7 +3,7 @@ module.exports = {
   KIMI_MODEL_ID: '7464130855104266240',
   
   // API基础URL，使用Vercel提供的域名
-  apiBaseUrl: 'https://your-app.vercel.app',  // 请将此处替换为Vercel提供的实际域名
+  apiBaseUrl: 'https://zhufu-xingyans-projects-8585e874.vercel.app',
   
   // 版本信息
   version: '1.0.0',
