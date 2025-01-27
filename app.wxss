@@ -1,0 +1,53 @@
+/**app.wxss**/
+page {
+  --primary-color: #007AFF;
+  --success-color: #34C759;
+  --background-color: #ffffff;
+  --text-color: #000000;
+  --text-secondary: #666666;
+  --border-radius: 16rpx;
+  
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 
+    Arial, sans-serif;
+  line-height: 1.5;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+.container {
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+button {
+  position: relative;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+  font-size: 32rpx;
+  text-align: center;
+  text-decoration: none;
+  line-height: 96rpx;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  color: #ffffff;
+  background-color: var(--primary-color);
+  border: none;
+}
+
+button::after {
+  border: none;
+}
+
+.input-box {
+  background-color: #FFFFFF;
+  padding: 20rpx;
+  border-radius: 10rpx;
+  margin: 20rpx 0;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+}
+
+input {
+  font-size: 32rpx;
+}

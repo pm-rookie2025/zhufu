@@ -1,0 +1,48 @@
+{
+  "description": "项目配置文件",
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "miniprogramRoot": "",
+  "compileType": "miniprogram",
+  "projectname": "暖心元旦祝福",
+  "setting": {
+    "useCompilerPlugins": [
+      "typescript"
+    ],
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "es6": false,
+    "enhance": false,
+    "packNpmManually": false,
+    "minified": true,
+    "uglifyFileName": false,
+    "request": {
+      "domain": "http://localhost:8080",
+      "protocol": "http",
+      "method": "POST",
+      "timeout": 20000,
+      "dataType": "json",
+      "responseType": "text",
+      "data": {},
+      "header": {}
+    },
+    "urlCheck": false,
+    "ignoreDevUnusedFiles": false,
+    "ignoreUploadUnusedFiles": false
+  },
+  "simulatorType": "wechat",
+  "simulatorPluginLibVersion": {},
+  "condition": {},
+  "srcMiniprogramRoot": "",
+  "appid": "wx0490f0cd31713130",
+  "libVersion": "3.0.0",
+  "editorSetting": {
+    "tabIndent": "insertSpaces",
+    "tabSize": 2
+  }
+}

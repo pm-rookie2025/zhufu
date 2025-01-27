@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>藏头诗生成器</title>
+    <style>
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: "楷体", KaiTi, serif;
+            background-color: #f9f6f2;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        #messageInput {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #d4a017;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #b8860b;
+        }
+        .poem-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .poem-content {
+            font-size: 20px;
+            line-height: 2;
+            text-align: center;
+        }
+        .poem-line {
+            margin: 10px 0;
+        }
+        .status {
+            color: #666;
+            font-style: italic;
+        }
+        #debug {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center; color: #d4a017;">藏头诗生成器</h1>
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="请输入藏头诗的关键字..." />
+            <button onclick="sendMessage()">生成诗词</button>
+        </div>
+        <div id="status" class="status"></div>
+        <div id="response" class="poem-container">
+            <div class="poem-content"></div>
+        </div>
+        <div id="debug"></div>
+    </div>
+
+    <script>
+        function appendDebug(message) {
+            const debugDiv = document.getElementById('debug');
+            const timestamp = new Date().toLocaleTimeString();
+            debugDiv.textContent += `[${timestamp}] ${message}\n`;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const statusDiv = document.getElementById('status');
+            const responseDiv = document.getElementById('response');
+            const poemContent = responseDiv.querySelector('.poem-content');
+            const debugDiv = document.getElementById('debug');
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+            
+            poemContent.innerHTML = '';
+            statusDiv.textContent = '正在生成诗词...';
+            debugDiv.textContent = ''; // 清空调试信息
+            
+            try {
+                appendDebug('开始发送请求...');
+                const response = await fetch('http://localhost:8080/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                appendDebug('请求已发送，开始读取响应...');
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        appendDebug('响应读取完成');
+                        break;
+                    }
+
+                    const chunk = decoder.decode(value);
+                    buffer += chunk;
+                    appendDebug(`收到数据块: ${chunk.length} 字节`);
+                    
+                    // 查找完整的事件消息
+                    const events = buffer.split('\n\n');
+                    buffer = events.pop() || ''; // 保留最后一个不完整的事件
+
+                    for (const event of events) {
+                        appendDebug(`处理事件: ${event.slice(0, 100)}...`);
+                        
+                        if (event.includes('event:conversation.message.completed')) {
+                            appendDebug('找到 completed 事件');
+                            const match = event.match(/data:(.+)$/m);
+                            if (match) {
+                                try {
+                                    const data = JSON.parse(match[1]);
+                                    appendDebug(`解析的数据: ${JSON.stringify(data, null, 2)}`);
+                                    
+                                    if (data.content && !data.content.includes('generate_answer_finish')) {
+                                        appendDebug('提取到诗歌内容');
+                                        const lines = data.content.split('\n');
+                                        appendDebug(`诗歌行数: ${lines.length}`);
+                                        
+                                        const html = lines
+                                            .filter(line => line.trim())
+                                            .map(line => `<div class="poem-line">${line}</div>`)
+                                            .join('');
+                                            
+                                        appendDebug(`生成的HTML: ${html}`);
+                                        poemContent.innerHTML = html;
+                                        statusDiv.textContent = '诗词生成完成';
+                                        break;
+                                    }
+                                } catch (e) {
+                                    appendDebug(`解析JSON失败: ${e.toString()}`);
+                                }
+                            }
+                        }
+                    }
+                }
+
+            } catch (error) {
+                appendDebug(`发生错误: ${error.toString()}`);
+                console.error('Error:', error);
+                statusDiv.textContent = '发生错误: ' + error.message;
+            }
+        }
+
+        // 添加回车键发送功能
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

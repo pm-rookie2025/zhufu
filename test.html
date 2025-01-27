@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>藏头诗生成测试</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff1f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .input-section {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        input {
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ffccc7;
+            border-radius: 4px;
+            flex: 1;
+        }
+        button {
+            padding: 8px 16px;
+            background: #ff4d4f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #ffa39e;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 20px;
+            white-space: pre-line;
+        }
+        .poem {
+            font-size: 18px;
+            line-height: 1.8;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>藏头诗生成测试</h1>
+        <div class="input-section">
+            <input type="text" id="name" placeholder="请输入您的名字" maxlength="4">
+            <button onclick="generatePoem()" id="generateBtn">生成藏头诗</button>
+        </div>
+        <div id="result"></div>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const MODEL_ID = '7464130855104266240';
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            if (typeof message === 'object') {
+                message = JSON.stringify(message, null, 2);
+            }
+            logDiv.textContent = timestamp + ': ' + message + '\n' + logDiv.textContent;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        async function generatePoem() {
+            const nameInput = document.getElementById('name');
+            const name = nameInput.value.trim();
+            const generateBtn = document.getElementById('generateBtn');
+            const resultDiv = document.getElementById('result');
+
+            if (!name) {
+                alert('请输入名字');
+                return;
+            }
+
+            generateBtn.disabled = true;
+            generateBtn.textContent = '生成中...';
+            resultDiv.textContent = '正在生成藏头诗，请稍候...';
+            clearLog();
+
+            try {
+                log('开始调用API');
+                log('请求参数:');
+                const requestBody = {
+                    bot_id: MODEL_ID,
+                    messages: [{
+                        role: 'user',
+                        content: `请以"${name}"为藏头诗，创作一首七言新年贺诗。要求：
+1. 每句七个字，每个字都要用到
+2. 诗句要体现新年祝福的喜庆氛围，可以包含春联、福字、红包等新年元素
+3. 诗句要通顺优美，符合平仄
+4. 不需要完全按照名字顺序，但要确保所有字都用上
+请直接返回诗句，不要有任何解释。`
+                    }],
+                    stream: false
+                };
+                log(requestBody);
+
+                const response = await fetch('http://localhost:5000/api/generate-poem', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                log('收到API响应');
+                log('响应状态: ' + response.status);
+                log('响应头:');
+                response.headers.forEach((value, key) => {
+                    log(`${key}: ${value}`);
+                });
+
+                const responseText = await response.text();
+                log('响应内容:');
+                log(responseText);
+
+                if (!response.ok) {
+                    throw new Error('API调用失败: ' + (JSON.parse(responseText).error?.message || JSON.parse(responseText).msg || '未知错误'));
+                }
+
+                const data = JSON.parse(responseText);
+                if (!data.choices?.[0]?.message?.content) {
+                    throw new Error('API返回数据格式不正确');
+                }
+
+                const poem = data.choices[0].message.content.trim();
+                log('生成的诗句:');
+                log(poem);
+
+                // 格式化诗句显示
+                resultDiv.innerHTML = `<div class="poem">${poem.replace(/\n/g, '<br>')}</div>`;
+            } catch (error) {
+                log('错误: ' + error.message);
+                resultDiv.textContent = '生成失败: ' + error.message;
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '生成藏头诗';
+            }
+        }
+    </script>
+</body>
+</html>

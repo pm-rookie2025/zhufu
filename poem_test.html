@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>元旦藏头诗生成器</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+        button {
+            width: 100%;
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #response {
+            white-space: pre-wrap;
+            font-size: 18px;
+            line-height: 2;
+            margin-top: 20px;
+            padding: 20px;
+            border-left: 4px solid #4CAF50;
+            background-color: #f9f9f9;
+            display: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+            color: #666;
+        }
+        .loading:after {
+            content: '...';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80% { content: '....'; }
+            100% { content: '.....'; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>元旦藏头诗生成器</h1>
+        <div class="input-group">
+            <input type="text" id="characters" placeholder="请输入要作为藏头诗的汉字（如：新年快乐）" maxlength="8"/>
+            <button id="generateBtn" onclick="generatePoem()">生成藏头诗</button>
+        </div>
+        <div id="loading" class="loading">正在创作中</div>
+        <div id="response"></div>
+    </div>
+
+    <script>
+        const generateBtn = document.getElementById('generateBtn');
+        const loading = document.getElementById('loading');
+        const response = document.getElementById('response');
+
+        function generatePoem() {
+            const characters = document.getElementById('characters').value.trim();
+            if (!characters) {
+                alert('请输入汉字！');
+                return;
+            }
+            if (!/^[\u4e00-\u9fa5]+$/.test(characters)) {
+                alert('请只输入汉字！');
+                return;
+            }
+
+            generateBtn.disabled = true;
+            loading.style.display = 'block';
+            response.style.display = 'none';
+            response.textContent = '';
+
+            // 构建提示语
+            const prompt = `请创作一首藏头诗，每句的第一个字分别是："${characters}"。要求：\n1. 诗句优美，意境深远\n2. 符合元旦节日气氛\n3. 每句需要押韵\n4. 每句字数相同\n请直接输出诗句，不要有任何解释。`;
+
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    additional_messages: [{
+                        role: 'user',
+                        content: prompt,
+                        content_type: 'text'
+                    }]
+                })
+            })
+            .then(response => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                function processText(text) {
+                    try {
+                        const lines = text.split('\n');
+                        lines.forEach(line => {
+                            if (line.startsWith('data:')) {
+                                const jsonStr = line.slice(5).trim();
+                                if (jsonStr) {
+                                    const data = JSON.parse(jsonStr);
+                                    if (data.content) {
+                                        response.style.display = 'block';
+                                        response.textContent += data.content;
+                                    }
+                                }
+                            }
+                        });
+                    } catch (e) {
+                        console.error('Error processing response:', e);
+                    }
+                }
+
+                return new ReadableStream({
+                    start(controller) {
+                        function push() {
+                            reader.read().then(({done, value}) => {
+                                if (done) {
+                                    controller.close();
+                                    generateBtn.disabled = false;
+                                    loading.style.display = 'none';
+                                    return;
+                                }
+                                buffer += decoder.decode(value, {stream: true});
+                                const lines = buffer.split('\n');
+                                buffer = lines.pop();
+                                processText(lines.join('\n'));
+                                controller.enqueue(value);
+                                push();
+                            });
+                        }
+                        push();
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                generateBtn.disabled = false;
+                loading.style.display = 'none';
+                response.style.display = 'block';
+                response.textContent = '抱歉，生成诗歌时出现错误，请重试。';
+            });
+        }
+
+        // 添加回车键支持
+        document.getElementById('characters').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !generateBtn.disabled) {
+                generatePoem();
+            }
+        });
+    </script>
+</body>
+</html>

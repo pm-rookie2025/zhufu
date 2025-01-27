@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扣子API流式对话测试</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .chat-container {
+            margin: 20px 0;
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e8e8e8;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        .input-section {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        textarea {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            resize: vertical;
+            min-height: 80px;
+        }
+        button {
+            padding: 8px 16px;
+            background: #1890ff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            height: 40px;
+        }
+        button:disabled {
+            background: #bae7ff;
+            cursor: not-allowed;
+        }
+        .message {
+            margin: 8px 0;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .user-message {
+            background: #e6f7ff;
+            margin-left: 20%;
+        }
+        .bot-message {
+            background: #f6ffed;
+            margin-right: 20%;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>扣子API流式对话测试</h1>
+        <div class="chat-container" id="chatContainer"></div>
+        <div class="input-section">
+            <textarea id="userInput" placeholder="请输入您的问题"></textarea>
+            <button onclick="sendMessage()" id="sendBtn">发送</button>
+        </div>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        let currentBotMessage = null;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            if (typeof message === 'object') {
+                message = JSON.stringify(message, null, 2);
+            }
+            logDiv.textContent = `${timestamp}: ${message}\n${logDiv.textContent}`;
+            console.log(message);
+        }
+
+        function appendMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            messageDiv.textContent = content;
+            
+            if (!isUser && currentBotMessage) {
+                // 更新现有的机器人消息
+                currentBotMessage.textContent = content;
+            } else {
+                // 添加新消息
+                chatContainer.appendChild(messageDiv);
+                if (!isUser) {
+                    currentBotMessage = messageDiv;
+                }
+            }
+            
+            // 滚动到底部
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) {
+                alert('请输入内容');
+                return;
+            }
+
+            // 禁用输入和按钮
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+
+            // 显示用户消息
+            appendMessage(message, true);
+
+            try {
+                // 准备请求数据
+                const requestData = {
+                    additional_messages: [{
+                        role: 'user',
+                        content: message,
+                        content_type: 'text'
+                    }]
+                };
+
+                // 创建 EventSource
+                const response = await fetch('http://localhost:8080/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                // 检查响应是否成功
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // 读取流式响应
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let accumulatedResponse = '';
+
+                while (true) {
+                    const {value, done} = await reader.read();
+                    if (done) break;
+                    
+                    // 解码二进制数据
+                    const chunk = decoder.decode(value);
+                    log('收到数据块：' + chunk);
+                    
+                    // 处理SSE格式的数据
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            try {
+                                const parsedData = JSON.parse(data);
+                                if (parsedData.choices && parsedData.choices[0]) {
+                                    const content = parsedData.choices[0].delta?.content || '';
+                                    accumulatedResponse += content;
+                                    appendMessage(accumulatedResponse);
+                                }
+                            } catch (e) {
+                                log('解析数据出错：' + e.message);
+                            }
+                        }
+                    }
+                }
+
+                // 重置当前机器人消息引用
+                currentBotMessage = null;
+
+            } catch (error) {
+                log('错误：' + error.message);
+                appendMessage('发生错误：' + error.message);
+            } finally {
+                // 重置输入框和按钮
+                userInput.value = '';
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        // 添加回车发送功能
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

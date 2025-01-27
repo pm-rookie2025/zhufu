@@ -1,0 +1,35 @@
+<!--index.wxml-->
+<view class="container">
+  <view class="header">
+    <text class="title">藏头诗送祝福</text>
+    <text class="subtitle">博贤携妻女给您拜年啦</text>
+  </view>
+
+  <view class="input-section">
+    <input class="name-input" 
+           type="text" 
+           placeholder="请输入您的名字（2-4个字）" 
+           bindinput="onNameInput"
+           value="{{name}}"
+           maxlength="4"/>
+    
+    <button class="generate-btn {{name ? '' : 'disabled'}}"
+            bindtap="generateBlessing"
+            disabled="{{!name || isGenerating}}"
+            loading="{{isGenerating}}">
+      {{isGenerating ? '祝福生成中...' : '生成祝福'}}
+    </button>
+  </view>
+
+  <view class="blessing-section" wx:if="{{blessing && blessing.lines}}">
+    <view class="blessing-title">您的专属藏头诗</view>
+    <view class="poem-content">
+      <block wx:for="{{blessing.lines}}" wx:key="index">
+        <view class="poem-couplet">
+          <text class="poem-line">{{item[0]}}</text>
+          <text class="poem-line" wx:if="{{item[1]}}">{{item[1]}}</text>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>
