@@ -92,71 +92,85 @@ async function generatePoemWithName(name) {
     return cached
   }
 
-  try {
-    // 打印完整的请求URL
-    const requestUrl = `${config.apiBaseUrl}/api/chat`
-    console.log('准备调用API，URL:', requestUrl)
-    
-    // 调用扣子API
-    const response = await new Promise((resolve, reject) => {
-      console.log('发送请求...')
-      wx.request({
-        url: requestUrl,
-        method: 'POST',
-        header: {
-          'content-type': 'application/json'
-        },
-        data: {
-          message: name
-        },
-        success: (res) => {
-          console.log('API响应成功:', res)
-          if (res.statusCode === 200 && res.data) {
-            if (res.data.error) {
-              console.error('API返回错误:', res.data.error)
-              reject(new Error(res.data.error))
+  let retryCount = 0
+  const maxRetries = 3
+
+  while (retryCount < maxRetries) {
+    try {
+      // 打印完整的请求URL
+      const requestUrl = `${config.apiBaseUrl}/api/chat`
+      console.log('准备调用API，URL:', requestUrl)
+      
+      // 调用扣子API
+      const response = await new Promise((resolve, reject) => {
+        console.log('发送请求...')
+        wx.request({
+          url: requestUrl,
+          method: 'POST',
+          header: {
+            'content-type': 'application/json'
+          },
+          data: {
+            message: name
+          },
+          timeout: 30000,  // 增加超时时间到30秒
+          success: (res) => {
+            console.log('API响应成功:', res)
+            if (res.statusCode === 200 && res.data) {
+              if (res.data.error) {
+                console.error('API返回错误:', res.data.error)
+                reject(new Error(res.data.error))
+              } else {
+                resolve(res)
+              }
             } else {
-              resolve(res)
+              const error = new Error(`请求失败: ${res.statusCode}`)
+              console.error(error)
+              reject(error)
             }
-          } else {
-            const error = new Error(`请求失败: ${res.statusCode}`)
-            console.error(error)
-            reject(error)
+          },
+          fail: (err) => {
+            console.error('API请求失败:', err)
+            // 如果是超时错误，给出更友好的提示
+            if (err.errMsg && err.errMsg.includes('timeout')) {
+              reject(new Error('网络请求超时，请稍后再试'))
+            } else {
+              reject(new Error(err.errMsg || '网络请求失败'))
+            }
           }
-        },
-        fail: (err) => {
-          console.error('API请求失败:', err)
-          reject(new Error(err.errMsg || '网络请求失败'))
-        }
+        })
       })
-    })
 
-    console.log('开始处理API响应:', response.data)
-    
-    // 检查响应数据
-    if (!response.data || (!response.data.content && !response.data.error)) {
-      const error = new Error('API响应格式不正确')
-      console.error(error, response.data)
-      throw error
+      console.log('开始处理API响应:', response.data)
+      
+      // 检查响应数据
+      if (!response.data || (!response.data.content && !response.data.error)) {
+        const error = new Error('API响应格式不正确')
+        console.error(error, response.data)
+        throw error
+      }
+
+      if (response.data.error) {
+        const error = new Error(response.data.error)
+        console.error('API返回错误:', error)
+        throw error
+      }
+
+      // 解析诗歌内容
+      const blessing = parsePoem(response.data.content)
+      console.log('生成的祝福:', blessing)
+
+      // 缓存结果
+      cacheBlessing(name, blessing)
+
+      return blessing
+    } catch (error) {
+      retryCount++
+      console.error(`生成祝福失败，重试次数：${retryCount}`, error)
+      if (retryCount >= maxRetries) {
+        throw error
+      }
     }
-
-    if (response.data.error) {
-      const error = new Error(response.data.error)
-      console.error('API返回错误:', error)
-      throw error
-    }
-
-    // 解析诗歌内容
-    const blessing = parsePoem(response.data.content)
-    console.log('生成的祝福:', blessing)
-
-    // 缓存结果
-    cacheBlessing(name, blessing)
-
-    return blessing
-  } catch (error) {
-    console.error('生成祝福失败:', error)
-    throw error // 让调用者处理错误
   }
 }
 
