@@ -42,9 +42,9 @@ def chat():
         request_data = {
             'bot_id': '7464130855104266240',
             'user_id': '123456789',
-            'stream': True,
+            'stream': False,  # 关闭流式响应
             'auto_save_history': True,
-            'additional_messages': [{
+            'messages': [{  # 使用正确的消息格式
                 'role': 'user',
                 'content': f'请以"{message}"为藏头诗，创作一首七言新年贺诗。要求：\n1. 每句七个字，每个字都要用到\n2. 诗句要体现新年祝福的喜庆氛围，可以包含春联、福字、红包等新年元素\n3. 诗句要通顺优美，符合平仄\n4. 不需要完全按照名字顺序，但要确保所有字都用上\n请直接返回诗句，不要有任何解释。',
                 'content_type': 'text'
@@ -55,8 +55,7 @@ def chat():
 
         headers = {
             'Authorization': f'Bearer {API_KEY}',
-            'Content-Type': 'application/json',
-            'Accept': 'text/event-stream'
+            'Content-Type': 'application/json'
         }
 
         logger.info("开始发送请求到扣子API")
@@ -64,42 +63,35 @@ def chat():
             COZE_API_URL,
             json=request_data,
             headers=headers,
-            stream=True,
-            timeout=30  # 设置30秒超时
+            timeout=30
         )
         
         logger.info(f"API响应状态码: {response.status_code}")
+        logger.info(f"API响应内容: {response.text}")
         
         if response.status_code != 200:
             error_msg = f"API错误: {response.text}"
             logger.error(error_msg)
             return jsonify({'error': error_msg}), response.status_code
 
-        poem_content = ""
-        for line in response.iter_lines():
-            if line:
-                try:
-                    line_text = line.decode('utf-8')
-                    logger.debug(f"收到原始响应行: {line_text}")
-                    
-                    if 'event:conversation.message.delta' in line_text:
-                        data_match = line_text.split('data:', 1)
-                        if len(data_match) > 1:
-                            data = json.loads(data_match[1])
-                            if data.get('content'):
-                                poem_content += data['content']
-                    
-                    elif 'event:conversation.message.completed' in line_text:
-                        if poem_content:
-                            logger.info(f"生成的诗歌内容: {poem_content}")
-                            return jsonify({'content': poem_content})
+        try:
+            response_data = response.json()
+            if 'message' in response_data:
+                content = response_data['message'].get('content', '')
+                if content:
+                    logger.info(f"生成的诗歌内容: {content}")
+                    return jsonify({'content': content})
+                else:
+                    error_msg = "API响应中没有内容"
+                    logger.error(error_msg)
+                    return jsonify({'error': error_msg}), 500
+            else:
+                error_msg = "API响应格式不正确"
+                logger.error(error_msg)
+                return jsonify({'error': error_msg}), 500
 
-                except Exception as decode_error:
-                    logger.error(f"解码错误: {str(decode_error)}")
-                    continue
-
-        if not poem_content:
-            error_msg = "未能生成诗歌内容"
+        except json.JSONDecodeError as e:
+            error_msg = f"JSON解析错误: {str(e)}"
             logger.error(error_msg)
             return jsonify({'error': error_msg}), 500
 
