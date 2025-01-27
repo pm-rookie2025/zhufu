@@ -65,7 +65,7 @@ def chat():
             json=request_data,
             headers=headers,
             stream=True,
-            timeout=30
+            timeout=30  # 设置30秒超时
         )
         
         logger.info(f"API响应状态码: {response.status_code}")
@@ -103,6 +103,10 @@ def chat():
             logger.error(error_msg)
             return jsonify({'error': error_msg}), 500
 
+    except requests.Timeout:
+        error_msg = "API请求超时，请稍后重试"
+        logger.error(error_msg)
+        return jsonify({'error': error_msg}), 504
     except Exception as e:
         error_msg = f"服务器错误: {str(e)}"
         logger.error(error_msg)
